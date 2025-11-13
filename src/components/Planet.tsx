@@ -10,6 +10,7 @@ interface PlanetProps {
   scale: number
   startAngle?: number
   orbitOpacity?: number
+  onPositionUpdate?: (position: THREE.Vector3) => void
   moons?: Array<{
     orbitRadius: number
     speed: number
@@ -19,7 +20,7 @@ interface PlanetProps {
   }>
 }
 
-const Planet = ({ orbitRadius, speed, color, scale, startAngle = 0, orbitOpacity = 0.6, moons = [] }: PlanetProps) => {
+const Planet = ({ orbitRadius, speed, color, scale, startAngle = 0, orbitOpacity = 0.6, onPositionUpdate, moons = [] }: PlanetProps) => {
   const meshRef = useRef<THREE.Mesh>(null)
   const glowRef = useRef<THREE.Mesh>(null)
   const outerGlowRef = useRef<THREE.Mesh>(null)
@@ -54,6 +55,9 @@ const Planet = ({ orbitRadius, speed, color, scale, startAngle = 0, orbitOpacity
       const z = Math.sin(angleRef.current) * orbitRadius
       groupRef.current.position.set(x, 0, z)
       positionRef.current.set(x, 0, z)
+      if (onPositionUpdate) {
+        onPositionUpdate(positionRef.current)
+      }
     }
 
     // Calculate pulsing scales

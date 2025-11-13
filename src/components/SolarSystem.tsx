@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Html } from '@react-three/drei'
 import { useFrame, useThree } from '@react-three/fiber'
+import * as THREE from 'three'
 import Star from './Star'
 import Planet from './Planet'
 import Starfield from './Starfield'
@@ -8,11 +9,15 @@ import Starfield from './Starfield'
 const CameraController = ({ 
   isSupernova, 
   onCameraReady,
-  sensitivity = 1.0
+  sensitivity = 1.0,
+  lockedPlanetIndex = null,
+  planetPositions = []
 }: { 
   isSupernova: boolean
   onCameraReady?: () => void
   sensitivity?: number
+  lockedPlanetIndex?: number | null
+  planetPositions?: THREE.Vector3[]
 }) => {
   const { camera } = useThree()
   const initialZ = useRef(camera.position.z)
@@ -53,6 +58,19 @@ const CameraController = ({
   }, [])
   
   useFrame(() => {
+    // Handle camera lock to planet
+    if (lockedPlanetIndex !== null && planetPositions[lockedPlanetIndex]) {
+      const targetPos = planetPositions[lockedPlanetIndex]
+      const distance = 8 // Distance from planet
+      const offset = new THREE.Vector3(0, 3, distance)
+      const desiredPosition = targetPos.clone().add(offset)
+      
+      // Smoothly move camera to follow planet
+      camera.position.lerp(desiredPosition, 0.05)
+      camera.lookAt(targetPos)
+      return // Skip other camera controls when locked
+    }
+
     // Handle keyboard camera rotation with easing
     if (!isSupernova && !isAnimating.current) {
       const acceleration = 0.001 * sensitivity / 3
@@ -138,6 +156,8 @@ const SolarSystem = () => {
   const [sensitivity, setSensitivity] = useState(3.0)
   const [isDraggingSlider, setIsDraggingSlider] = useState(false)
   const [orbitOpacity, setOrbitOpacity] = useState(0.6)
+  const [lockedPlanet, setLockedPlanet] = useState<number | null>(null)
+  const planetPositionsRef = useRef<THREE.Vector3[]>([])
   const { camera, gl } = useThree()
   
   // Update camera FOV when slider changes
@@ -315,7 +335,13 @@ const SolarSystem = () => {
   return (
     <>
       <Starfield />
-      <CameraController isSupernova={isSupernova} onCameraReady={handleCameraReady} sensitivity={sensitivity} />
+      <CameraController 
+        isSupernova={isSupernova} 
+        onCameraReady={handleCameraReady} 
+        sensitivity={sensitivity}
+        lockedPlanetIndex={lockedPlanet}
+        planetPositions={planetPositionsRef.current}
+      />
       <ambientLight intensity={0.1} />
       <Star isSupernova={isSupernova} canExpand={starCanExpand} />
       {planets.map((planet, index) => (
@@ -328,6 +354,9 @@ const SolarSystem = () => {
           startAngle={index * Math.PI / 3} // Spread planets around the orbit
           orbitOpacity={orbitOpacity}
           moons={planet.moons}
+          onPositionUpdate={(pos) => {
+            planetPositionsRef.current[index] = pos.clone()
+          }}
         />
       ))}
       
@@ -384,6 +413,70 @@ const SolarSystem = () => {
           >
             {isWormhole ? 'Wormhole Active...' : 'Trigger Wormhole'}
           </button>
+
+          {/* Planet Focus Section */}
+          <div style={{
+            backgroundColor: 'rgba(0, 0, 0, 0.7)',
+            padding: '15px',
+            borderRadius: '8px',
+            boxShadow: '0 4px 6px rgba(0,0,0,0.3)',
+            color: 'white',
+            minWidth: '250px'
+          }}>
+            <div style={{
+              fontSize: '14px',
+              fontWeight: 'bold',
+              marginBottom: '10px'
+            }}>
+              Focus Planet
+            </div>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(2, 1fr)',
+              gap: '8px'
+            }}>
+              {planets.map((planet, index) => (
+                <button
+                  key={index}
+                  onClick={() => setLockedPlanet(index)}
+                  disabled={lockedPlanet === index}
+                  style={{
+                    padding: '8px',
+                    fontSize: '12px',
+                    fontWeight: 'bold',
+                    backgroundColor: lockedPlanet === index ? planet.color : 'rgba(255,255,255,0.1)',
+                    color: 'white',
+                    border: `2px solid ${planet.color}`,
+                    borderRadius: '6px',
+                    cursor: lockedPlanet === index ? 'not-allowed' : 'pointer',
+                    transition: 'all 0.2s ease',
+                  }}
+                >
+                  {planet.name}
+                </button>
+              ))}
+            </div>
+            {lockedPlanet !== null && (
+              <button
+                onClick={() => setLockedPlanet(null)}
+                style={{
+                  marginTop: '10px',
+                  width: '100%',
+                  padding: '8px',
+                  fontSize: '14px',
+                  fontWeight: 'bold',
+                  backgroundColor: '#CC0000',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                }}
+              >
+                ✕ Unlock Camera
+              </button>
+            )}
+          </div>
           
           {/* FOV Slider */}
           <div style={{
