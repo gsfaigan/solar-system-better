@@ -178,14 +178,73 @@ const SolarSystem = () => {
   const PATH_SCALE = 3
 
   const planets = [
-    { orbitRadius: 3 * PATH_SCALE, speed: 4.15 * speedMultiplier, color: '#8B7355', scale: 0.5 * SIZE_SCALE, name: 'Mercury' },    // 0.38x Earth size, 88 days
-    { orbitRadius: 4.5 * PATH_SCALE, speed: 1.62 * speedMultiplier, color: '#FFC649', scale: 0.95 * SIZE_SCALE, name: 'Venus' },   // 0.95x Earth size, 225 days
-    { orbitRadius: 6 * PATH_SCALE, speed: 1.0 * speedMultiplier, color: '#4A90E2', scale: 1.0 * SIZE_SCALE, name: 'Earth' },       // 1.0x Earth size (baseline), 365 days
-    { orbitRadius: 7.5 * PATH_SCALE, speed: 0.53 * speedMultiplier, color: '#CD5C5C', scale: 0.53 * SIZE_SCALE, name: 'Mars' },    // 0.53x Earth size, 687 days
-    { orbitRadius: 11 * PATH_SCALE, speed: 0.084 * speedMultiplier, color: '#C88B3A', scale: 4.5 * SIZE_SCALE, name: 'Jupiter' }, // 11.2x Earth size, 11.86 years
-    { orbitRadius: 15 * PATH_SCALE, speed: 0.034 * speedMultiplier, color: '#F4E7C3', scale: 3.5 * SIZE_SCALE, name: 'Saturn' },  // 9.45x Earth size, 29.5 years
-    { orbitRadius: 19 * PATH_SCALE, speed: 0.012 * speedMultiplier, color: '#4FD0E7', scale: 2.5 * SIZE_SCALE, name: 'Uranus' },   // 4.0x Earth size, 84 years
-    { orbitRadius: 23 * PATH_SCALE, speed: 0.006 * speedMultiplier, color: '#4169E1', scale: 2 * SIZE_SCALE, name: 'Neptune' }, // 3.88x Earth size, 164.8 years
+    { orbitRadius: 3 * PATH_SCALE, speed: 4.15 * speedMultiplier, color: '#8B7355', scale: 0.5 * SIZE_SCALE, name: 'Mercury', moons: [] },
+    { orbitRadius: 4.5 * PATH_SCALE, speed: 1.62 * speedMultiplier, color: '#FFC649', scale: 0.95 * SIZE_SCALE, name: 'Venus', moons: [] },
+    { 
+      orbitRadius: 6 * PATH_SCALE, 
+      speed: 1.0 * speedMultiplier, 
+      color: '#4A90E2', 
+      scale: 1.0 * SIZE_SCALE, 
+      name: 'Earth',
+      moons: [
+        { orbitRadius: 0.8, speed: 13.0 * speedMultiplier, color: '#CCCCCC', scale: 0.15 * SIZE_SCALE }
+      ]
+    },
+    { 
+      orbitRadius: 7.5 * PATH_SCALE, 
+      speed: 0.53 * speedMultiplier, 
+      color: '#CD5C5C', 
+      scale: 0.53 * SIZE_SCALE, 
+      name: 'Mars',
+      moons: [
+        { orbitRadius: 0.4, speed: 7.0 * speedMultiplier, color: '#AAA', scale: 0.08 * SIZE_SCALE },
+        { orbitRadius: 0.6, speed: 4.0 * speedMultiplier, color: '#999', scale: 0.06 * SIZE_SCALE }
+      ]
+    },
+    { 
+      orbitRadius: 11 * PATH_SCALE, 
+      speed: 0.084 * speedMultiplier, 
+      color: '#C88B3A', 
+      scale: 4.5 * SIZE_SCALE, 
+      name: 'Jupiter',
+      moons: [
+        { orbitRadius: 2.5, speed: 2.4 * speedMultiplier, color: '#E6D5AC', scale: 0.2 * SIZE_SCALE }, // Io
+        { orbitRadius: 3.0, speed: 1.8 * speedMultiplier, color: '#C9B18C', scale: 0.18 * SIZE_SCALE }, // Europa
+        { orbitRadius: 3.8, speed: 1.2 * speedMultiplier, color: '#B8A68A', scale: 0.25 * SIZE_SCALE }, // Ganymede
+        { orbitRadius: 4.5, speed: 0.9 * speedMultiplier, color: '#A89677', scale: 0.23 * SIZE_SCALE }  // Callisto
+      ]
+    },
+    { 
+      orbitRadius: 15 * PATH_SCALE, 
+      speed: 0.034 * speedMultiplier, 
+      color: '#F4E7C3', 
+      scale: 3.5 * SIZE_SCALE, 
+      name: 'Saturn',
+      moons: [
+        { orbitRadius: 2.0, speed: 3.5 * speedMultiplier, color: '#E8DCC8', scale: 0.15 * SIZE_SCALE }, // Titan
+        { orbitRadius: 2.8, speed: 2.0 * speedMultiplier, color: '#D4C4B0', scale: 0.1 * SIZE_SCALE }   // Rhea
+      ]
+    },
+    { 
+      orbitRadius: 19 * PATH_SCALE, 
+      speed: 0.012 * speedMultiplier, 
+      color: '#4FD0E7', 
+      scale: 2.5 * SIZE_SCALE, 
+      name: 'Uranus',
+      moons: [
+        { orbitRadius: 1.5, speed: 4.0 * speedMultiplier, color: '#B8D8E8', scale: 0.12 * SIZE_SCALE }
+      ]
+    },
+    { 
+      orbitRadius: 23 * PATH_SCALE, 
+      speed: 0.006 * speedMultiplier, 
+      color: '#4169E1', 
+      scale: 2 * SIZE_SCALE, 
+      name: 'Neptune',
+      moons: [
+        { orbitRadius: 1.3, speed: 5.0 * speedMultiplier, color: '#7BA3D1', scale: 0.11 * SIZE_SCALE }
+      ]
+    }
   ]
 
   const handleSupernova = () => {
@@ -268,6 +327,7 @@ const SolarSystem = () => {
           scale={planet.scale}
           startAngle={index * Math.PI / 3} // Spread planets around the orbit
           orbitOpacity={orbitOpacity}
+          moons={planet.moons}
         />
       ))}
       

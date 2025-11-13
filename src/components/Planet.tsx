@@ -1,6 +1,7 @@
 import { useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
+import Moon from './Moon'
 
 interface PlanetProps {
   orbitRadius: number
@@ -9,15 +10,23 @@ interface PlanetProps {
   scale: number
   startAngle?: number
   orbitOpacity?: number
+  moons?: Array<{
+    orbitRadius: number
+    speed: number
+    color: string
+    scale: number
+    startAngle?: number
+  }>
 }
 
-const Planet = ({ orbitRadius, speed, color, scale, startAngle = 0, orbitOpacity = 0.6 }: PlanetProps) => {
+const Planet = ({ orbitRadius, speed, color, scale, startAngle = 0, orbitOpacity = 0.6, moons = [] }: PlanetProps) => {
   const meshRef = useRef<THREE.Mesh>(null)
   const glowRef = useRef<THREE.Mesh>(null)
   const outerGlowRef = useRef<THREE.Mesh>(null)
   const groupRef = useRef<THREE.Group>(null)
   const angleRef = useRef(startAngle)
   const textureRotationRef = useRef(0)
+  const positionRef = useRef(new THREE.Vector3(0, 0, 0))
 
   // Create orbital path geometry
   const orbitPoints = []
@@ -44,6 +53,7 @@ const Planet = ({ orbitRadius, speed, color, scale, startAngle = 0, orbitOpacity
       const x = Math.cos(angleRef.current) * orbitRadius
       const z = Math.sin(angleRef.current) * orbitRadius
       groupRef.current.position.set(x, 0, z)
+      positionRef.current.set(x, 0, z)
     }
 
     // Calculate pulsing scales
@@ -118,6 +128,20 @@ const Planet = ({ orbitRadius, speed, color, scale, startAngle = 0, orbitOpacity
           />
         </mesh>
       </group>
+
+      {/* Render moons */}
+      {moons.map((moon, index) => (
+        <Moon
+          key={index}
+          orbitRadius={moon.orbitRadius}
+          speed={moon.speed}
+          color={moon.color}
+          scale={moon.scale}
+          startAngle={moon.startAngle || index * Math.PI / 2}
+          parentPosition={positionRef.current}
+          orbitOpacity={orbitOpacity}
+        />
+      ))}
     </>
   )
 }
