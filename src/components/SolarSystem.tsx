@@ -287,6 +287,7 @@ interface SolarSystemProps {
   lockedPlanet: number | null
   cameraLockMode: 'follow' | 'track'
   planetPositionsRef: React.MutableRefObject<THREE.Vector3[]>
+  cameraResetTrigger: number
 }
 
 const SolarSystem = ({
@@ -301,10 +302,23 @@ const SolarSystem = ({
   orbitOpacity,
   lockedPlanet,
   cameraLockMode,
-  planetPositionsRef
+  planetPositionsRef,
+  cameraResetTrigger
 }: SolarSystemProps) => {
   const [starCanExpand, setStarCanExpand] = useState(false)
   const { camera, gl } = useThree()
+  
+  // Reset camera position when reset is triggered
+  useEffect(() => {
+    if (cameraResetTrigger > 0) {
+      camera.position.set(0, 5, 15)
+      camera.lookAt(0, 0, 0)
+      if ('fov' in camera) {
+        (camera as THREE.PerspectiveCamera).fov = 60
+        camera.updateProjectionMatrix()
+      }
+    }
+  }, [cameraResetTrigger, camera])
   
   // Update camera FOV when slider changes
   useEffect(() => {

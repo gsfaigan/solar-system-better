@@ -19,6 +19,7 @@ interface UIProps {
   onOrbitOpacityChange: (opacity: number) => void
   onDragStart: () => void
   onDragEnd: () => void
+  onReset: () => void
 }
 
 const UI = ({
@@ -41,7 +42,8 @@ const UI = ({
   orbitOpacity,
   onOrbitOpacityChange,
   onDragStart,
-  onDragEnd
+  onDragEnd,
+  onReset
 }: UIProps) => {
   return (
     <div style={{
@@ -363,6 +365,25 @@ const UI = ({
           />
         </label>
       </div>
+
+      {/* Reset Button */}
+      <button
+        onClick={onReset}
+        style={{
+          padding: '12px 24px',
+          fontSize: '16px',
+          fontWeight: 'bold',
+          backgroundColor: '#460b0bff',
+          color: 'white',
+          border: 'none',
+          borderRadius: '8px',
+          cursor: 'pointer',
+          boxShadow: '0 4px 6px rgba(0,0,0,0.3)',
+          transition: 'all 0.3s ease',
+        }}
+      >
+        Reset Everything
+      </button>
     </div>
   )
 }

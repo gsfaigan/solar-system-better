@@ -7,15 +7,39 @@ import DynamicOrbitControls from './components/DynamicOrbitControls'
 
 function App() {
   const planetPositionsRef = useRef<THREE.Vector3[]>([])
+  const cameraResetTrigger = useRef(0)
+  
+  // Default values
+  const DEFAULT_FOV = 60
+  const DEFAULT_SPEED = 1
+  const DEFAULT_SENSITIVITY = 3
+  const DEFAULT_ORBIT_OPACITY = 0.6
+  const DEFAULT_CAMERA_LOCK_MODE = 'follow' as const
+  
   const [isSupernova, setIsSupernova] = useState(false)
   const [isWormhole, setIsWormhole] = useState(false)
-  const [fov, setFov] = useState(60)
-  const [speedMultiplier, setSpeedMultiplier] = useState(1)
-  const [sensitivity, setSensitivity] = useState(3)
+  const [fov, setFov] = useState(DEFAULT_FOV)
+  const [speedMultiplier, setSpeedMultiplier] = useState(DEFAULT_SPEED)
+  const [sensitivity, setSensitivity] = useState(DEFAULT_SENSITIVITY)
   const [isDraggingSlider, setIsDraggingSlider] = useState(false)
-  const [orbitOpacity, setOrbitOpacity] = useState(0.6)
+  const [orbitOpacity, setOrbitOpacity] = useState(DEFAULT_ORBIT_OPACITY)
   const [lockedPlanet, setLockedPlanet] = useState<number | null>(null)
-  const [cameraLockMode, setCameraLockMode] = useState<'follow' | 'track'>('follow')
+  const [cameraLockMode, setCameraLockMode] = useState<'follow' | 'track'>(DEFAULT_CAMERA_LOCK_MODE)
+
+  const handleReset = () => {
+    // Reset all settings to defaults
+    setFov(DEFAULT_FOV)
+    setSpeedMultiplier(DEFAULT_SPEED)
+    setSensitivity(DEFAULT_SENSITIVITY)
+    setOrbitOpacity(DEFAULT_ORBIT_OPACITY)
+    setLockedPlanet(null)
+    setCameraLockMode(DEFAULT_CAMERA_LOCK_MODE)
+    setIsSupernova(false)
+    setIsWormhole(false)
+    
+    // Trigger camera reset in the scene
+    cameraResetTrigger.current += 1
+  }
 
   // Planet data for UI buttons
   const planets = [
@@ -51,6 +75,7 @@ function App() {
           lockedPlanet={lockedPlanet}
           cameraLockMode={cameraLockMode}
           planetPositionsRef={planetPositionsRef}
+          cameraResetTrigger={cameraResetTrigger.current}
         />
       </Canvas>
       <UI
@@ -74,6 +99,7 @@ function App() {
         onOrbitOpacityChange={setOrbitOpacity}
         onDragStart={() => setIsDraggingSlider(true)}
         onDragEnd={() => setIsDraggingSlider(false)}
+        onReset={handleReset}
       />
     </>
   )
