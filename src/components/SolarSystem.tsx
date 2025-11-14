@@ -26,6 +26,7 @@ const CameraController = ({
   const hasNotifiedReady = useRef(false)
   const keysPressed = useRef<Set<string>>(new Set())
   const velocity = useRef({ horizontal: 0, vertical: 0 })
+  const lastPlanetPos = useRef<THREE.Vector3 | null>(null)
   
   useEffect(() => {
     if (isSupernova) {
@@ -35,6 +36,11 @@ const CameraController = ({
       hasNotifiedReady.current = false
     }
   }, [isSupernova, camera])
+
+  // Reset planet tracking when lock changes
+  useEffect(() => {
+    lastPlanetPos.current = null
+  }, [lockedPlanetIndex, cameraLockMode])
 
   // Keyboard controls for camera rotation
   useEffect(() => {
@@ -64,23 +70,135 @@ const CameraController = ({
       const targetPos = planetPositions[lockedPlanetIndex]
       
       if (cameraLockMode === 'follow') {
-        // Follow mode: lock camera position to planet
-        const distance = 8 // Distance from planet
-        const offset = new THREE.Vector3(0, 3, distance)
-        const desiredPosition = targetPos.clone().add(offset)
+        // Follow mode: camera follows planet through space with keyboard rotation
         
-        // Smoothly move camera to follow planet
-        camera.position.lerp(desiredPosition, 0.05)
-        camera.lookAt(targetPos)
-        return // Skip other camera controls when locked
+        if (!lastPlanetPos.current) {
+          // Initialize - first time locking to planet
+          lastPlanetPos.current = targetPos.clone()
+        } else {
+          // Calculate how much the planet moved since last frame
+          const planetDelta = targetPos.clone().sub(lastPlanetPos.current)
+          
+          // Move camera by the same amount (follows the planet)
+          camera.position.add(planetDelta)
+          
+          // Update last position
+          lastPlanetPos.current = targetPos.clone()
+        }
+        
+        // Handle keyboard rotation around the planet
+        if (!isSupernova && !isAnimating.current) {
+          const acceleration = 0.001 * sensitivity / 3
+          const maxSpeed = 0.02 * sensitivity / 3
+          const verticalAcceleration = 0.04 * sensitivity / 3
+          const maxVerticalSpeed = 1.2 * sensitivity / 3
+          const damping = 0.5
+          
+          // Accelerate based on key presses
+          if (keysPressed.current.has('ArrowRight')) {
+            velocity.current.horizontal = Math.min(velocity.current.horizontal + acceleration, maxSpeed)
+          } else if (keysPressed.current.has('ArrowLeft')) {
+            velocity.current.horizontal = Math.max(velocity.current.horizontal - acceleration, -maxSpeed)
+          } else {
+            velocity.current.horizontal *= damping
+            if (Math.abs(velocity.current.horizontal) < 0.0001) velocity.current.horizontal = 0
+          }
+          
+          if (keysPressed.current.has('ArrowUp')) {
+            velocity.current.vertical = Math.min(velocity.current.vertical + verticalAcceleration, maxVerticalSpeed)
+          } else if (keysPressed.current.has('ArrowDown')) {
+            velocity.current.vertical = Math.max(velocity.current.vertical - verticalAcceleration, -maxVerticalSpeed)
+          } else {
+            velocity.current.vertical *= damping
+            if (Math.abs(velocity.current.vertical) < 0.001) velocity.current.vertical = 0
+          }
+          
+          // Rotate around the locked planet
+          if (velocity.current.horizontal !== 0 || velocity.current.vertical !== 0) {
+            // Get current position relative to planet
+            const relativePos = camera.position.clone().sub(targetPos)
+            const radius = relativePos.length()
+            
+            // Calculate spherical coordinates
+            const theta = Math.atan2(relativePos.x, relativePos.z) + velocity.current.horizontal
+            const phi = Math.acos(relativePos.y / radius) - velocity.current.vertical * 0.1
+            
+            // Clamp phi to prevent flipping over poles
+            const clampedPhi = Math.max(0.1, Math.min(Math.PI - 0.1, phi))
+            
+            // Convert back to Cartesian coordinates
+            const newRelativePos = new THREE.Vector3(
+              radius * Math.sin(clampedPhi) * Math.sin(theta),
+              radius * Math.cos(clampedPhi),
+              radius * Math.sin(clampedPhi) * Math.cos(theta)
+            )
+            
+            // Set camera position relative to planet
+            camera.position.copy(targetPos.clone().add(newRelativePos))
+            
+            // Update lastPlanetPos since we moved the camera
+            lastPlanetPos.current = targetPos.clone()
+          }
+        }
+        
+        return // Skip sun-centric controls when locked
       } else {
-        // Track mode: only look at planet, allow free movement
+        // Track mode: orbit around planet with keyboard/mouse controls
+        const acceleration = 0.001 * sensitivity / 3
+        const maxSpeed = 0.02 * sensitivity / 3
+        const verticalAcceleration = 0.04 * sensitivity / 3
+        const maxVerticalSpeed = 1.2 * sensitivity / 3
+        const damping = 0.5
+        
+        // Accelerate based on key presses
+        if (keysPressed.current.has('ArrowRight')) {
+          velocity.current.horizontal = Math.min(velocity.current.horizontal + acceleration, maxSpeed)
+        } else if (keysPressed.current.has('ArrowLeft')) {
+          velocity.current.horizontal = Math.max(velocity.current.horizontal - acceleration, -maxSpeed)
+        } else {
+          velocity.current.horizontal *= damping
+          if (Math.abs(velocity.current.horizontal) < 0.0001) velocity.current.horizontal = 0
+        }
+        
+        if (keysPressed.current.has('ArrowUp')) {
+          velocity.current.vertical = Math.min(velocity.current.vertical + verticalAcceleration, maxVerticalSpeed)
+        } else if (keysPressed.current.has('ArrowDown')) {
+          velocity.current.vertical = Math.max(velocity.current.vertical - verticalAcceleration, -maxVerticalSpeed)
+        } else {
+          velocity.current.vertical *= damping
+          if (Math.abs(velocity.current.vertical) < 0.001) velocity.current.vertical = 0
+        }
+        
+        // Rotate around the locked planet
+        if (velocity.current.horizontal !== 0 || velocity.current.vertical !== 0) {
+          // Get current position relative to planet
+          const relativePos = camera.position.clone().sub(targetPos)
+          const radius = relativePos.length()
+          
+          // Calculate spherical coordinates
+          const theta = Math.atan2(relativePos.x, relativePos.z) + velocity.current.horizontal
+          const phi = Math.acos(relativePos.y / radius) - velocity.current.vertical * 0.1
+          
+          // Clamp phi to prevent flipping over poles
+          const clampedPhi = Math.max(0.1, Math.min(Math.PI - 0.1, phi))
+          
+          // Convert back to Cartesian coordinates
+          const newRelativePos = new THREE.Vector3(
+            radius * Math.sin(clampedPhi) * Math.sin(theta),
+            radius * Math.cos(clampedPhi),
+            radius * Math.sin(clampedPhi) * Math.cos(theta)
+          )
+          
+          // Set camera position relative to planet
+          camera.position.copy(targetPos.clone().add(newRelativePos))
+        }
+        
         camera.lookAt(targetPos)
-        // Don't return - allow keyboard controls
+        return // Skip sun-centric controls when locked
       }
     }
 
-    // Handle keyboard camera rotation with easing
+    // Handle keyboard camera rotation with easing (sun-centric)
     if (!isSupernova && !isAnimating.current) {
       const acceleration = 0.001 * sensitivity / 3
       const maxSpeed = 0.02 * sensitivity / 3
@@ -168,6 +286,7 @@ interface SolarSystemProps {
   orbitOpacity: number
   lockedPlanet: number | null
   cameraLockMode: 'follow' | 'track'
+  planetPositionsRef: React.MutableRefObject<THREE.Vector3[]>
 }
 
 const SolarSystem = ({
@@ -181,10 +300,10 @@ const SolarSystem = ({
   isDraggingSlider,
   orbitOpacity,
   lockedPlanet,
-  cameraLockMode
+  cameraLockMode,
+  planetPositionsRef
 }: SolarSystemProps) => {
   const [starCanExpand, setStarCanExpand] = useState(false)
-  const planetPositionsRef = useRef<THREE.Vector3[]>([])
   const { camera, gl } = useThree()
   
   // Update camera FOV when slider changes

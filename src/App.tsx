@@ -1,10 +1,12 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { Canvas } from '@react-three/fiber'
-import { OrbitControls } from '@react-three/drei'
+import * as THREE from 'three'
 import SolarSystem from './components/SolarSystem'
 import UI from './components/UI'
+import DynamicOrbitControls from './components/DynamicOrbitControls'
 
 function App() {
+  const planetPositionsRef = useRef<THREE.Vector3[]>([])
   const [isSupernova, setIsSupernova] = useState(false)
   const [isWormhole, setIsWormhole] = useState(false)
   const [fov, setFov] = useState(60)
@@ -31,12 +33,10 @@ function App() {
     <>
       <Canvas camera={{ position: [0, 5, 15], fov: 30 }}>
         <color attach="background" args={['#000000']} />
-        <OrbitControls 
-          enableDamping 
-          dampingFactor={0.05} 
-          rotateSpeed={0.5}
-          minDistance={10}
-          maxDistance={350}
+        <DynamicOrbitControls 
+          lockedPlanet={lockedPlanet}
+          planetPositions={planetPositionsRef.current}
+          isDraggingSlider={isDraggingSlider}
         />
         <SolarSystem 
           isSupernova={isSupernova}
@@ -50,6 +50,7 @@ function App() {
           orbitOpacity={orbitOpacity}
           lockedPlanet={lockedPlanet}
           cameraLockMode={cameraLockMode}
+          planetPositionsRef={planetPositionsRef}
         />
       </Canvas>
       <UI
