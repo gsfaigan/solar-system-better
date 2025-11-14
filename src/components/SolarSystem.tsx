@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from 'react'
-import { Html } from '@react-three/drei'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import Star from './Star'
@@ -11,13 +10,15 @@ const CameraController = ({
   onCameraReady,
   sensitivity = 1.0,
   lockedPlanetIndex = null,
-  planetPositions = []
+  planetPositions = [],
+  cameraLockMode = 'follow'
 }: { 
   isSupernova: boolean
   onCameraReady?: () => void
   sensitivity?: number
   lockedPlanetIndex?: number | null
   planetPositions?: THREE.Vector3[]
+  cameraLockMode?: 'follow' | 'track'
 }) => {
   const { camera } = useThree()
   const initialZ = useRef(camera.position.z)
@@ -61,14 +62,22 @@ const CameraController = ({
     // Handle camera lock to planet
     if (lockedPlanetIndex !== null && planetPositions[lockedPlanetIndex]) {
       const targetPos = planetPositions[lockedPlanetIndex]
-      const distance = 8 // Distance from planet
-      const offset = new THREE.Vector3(0, 3, distance)
-      const desiredPosition = targetPos.clone().add(offset)
       
-      // Smoothly move camera to follow planet
-      camera.position.lerp(desiredPosition, 0.05)
-      camera.lookAt(targetPos)
-      return // Skip other camera controls when locked
+      if (cameraLockMode === 'follow') {
+        // Follow mode: lock camera position to planet
+        const distance = 8 // Distance from planet
+        const offset = new THREE.Vector3(0, 3, distance)
+        const desiredPosition = targetPos.clone().add(offset)
+        
+        // Smoothly move camera to follow planet
+        camera.position.lerp(desiredPosition, 0.05)
+        camera.lookAt(targetPos)
+        return // Skip other camera controls when locked
+      } else {
+        // Track mode: only look at planet, allow free movement
+        camera.lookAt(targetPos)
+        // Don't return - allow keyboard controls
+      }
     }
 
     // Handle keyboard camera rotation with easing
@@ -147,16 +156,34 @@ const CameraController = ({
   return null
 }
 
-const SolarSystem = () => {
-  const [isSupernova, setIsSupernova] = useState(false)
+interface SolarSystemProps {
+  isSupernova: boolean
+  setIsSupernova: (value: boolean) => void
+  isWormhole: boolean
+  setIsWormhole: (value: boolean) => void
+  fov: number
+  speedMultiplier: number
+  sensitivity: number
+  isDraggingSlider: boolean
+  orbitOpacity: number
+  lockedPlanet: number | null
+  cameraLockMode: 'follow' | 'track'
+}
+
+const SolarSystem = ({
+  isSupernova,
+  setIsSupernova,
+  isWormhole,
+  setIsWormhole,
+  fov,
+  speedMultiplier,
+  sensitivity,
+  isDraggingSlider,
+  orbitOpacity,
+  lockedPlanet,
+  cameraLockMode
+}: SolarSystemProps) => {
   const [starCanExpand, setStarCanExpand] = useState(false)
-  const [fov, setFov] = useState(60)
-  const [speedMultiplier, setSpeedMultiplier] = useState(0.3)
-  const [isWormhole, setIsWormhole] = useState(false)
-  const [sensitivity, setSensitivity] = useState(3.0)
-  const [isDraggingSlider, setIsDraggingSlider] = useState(false)
-  const [orbitOpacity, setOrbitOpacity] = useState(0.6)
-  const [lockedPlanet, setLockedPlanet] = useState<number | null>(null)
   const planetPositionsRef = useRef<THREE.Vector3[]>([])
   const { camera, gl } = useThree()
   
@@ -267,14 +294,17 @@ const SolarSystem = () => {
     }
   ]
 
-  const handleSupernova = () => {
-    setIsSupernova(true)
+  useEffect(() => {
+    if (!isSupernova) return
+    
     setStarCanExpand(false)
-    setTimeout(() => {
+    const timeout = setTimeout(() => {
       setIsSupernova(false)
       setStarCanExpand(false)
-    }, 15000) // Reset after 15 seconds (camera pan ~3s + star expansion ~2s + viewing time ~10s)
-  }
+    }, 15000) // Reset after 15 seconds
+    
+    return () => clearTimeout(timeout)
+  }, [isSupernova, setIsSupernova])
 
   const handleCameraReady = () => {
     // Camera has panned out, now allow the star to expand
@@ -282,10 +312,9 @@ const SolarSystem = () => {
     setStarCanExpand(true)
   }
 
-  const handleWormhole = () => {
-    if (isWormhole) return // Prevent multiple clicks
+  useEffect(() => {
+    if (!isWormhole) return
     
-    setIsWormhole(true)
     const startFov = fov
     const targetFov = 170
     const startZ = camera.position.z
@@ -301,7 +330,11 @@ const SolarSystem = () => {
       const easeProgress = progress * progress // Ease in
       const newFov = startFov + (targetFov - startFov) * easeProgress
       const newZ = startZ + (targetZ - startZ) * easeProgress
-      setFov(newFov)
+      
+      if (camera && 'fov' in camera) {
+        (camera as THREE.PerspectiveCamera).fov = newFov
+        camera.updateProjectionMatrix()
+      }
       camera.position.z = newZ
       
       if (progress < 1) {
@@ -316,7 +349,11 @@ const SolarSystem = () => {
             const easeProgress = progress * (2 - progress) // Ease out
             const newFov = targetFov - (targetFov - startFov) * easeProgress
             const newZ = targetZ - (targetZ - startZ) * easeProgress
-            setFov(newFov)
+            
+            if (camera && 'fov' in camera) {
+              (camera as THREE.PerspectiveCamera).fov = newFov
+              camera.updateProjectionMatrix()
+            }
             camera.position.z = newZ
             
             if (progress < 1) {
@@ -330,7 +367,7 @@ const SolarSystem = () => {
       }
     }
     animateExpand()
-  }
+  }, [isWormhole, camera, fov, setIsWormhole])
 
   return (
     <>
@@ -341,6 +378,7 @@ const SolarSystem = () => {
         sensitivity={sensitivity}
         lockedPlanetIndex={lockedPlanet}
         planetPositions={planetPositionsRef.current}
+        cameraLockMode={cameraLockMode}
       />
       <ambientLight intensity={0.1} />
       <Star isSupernova={isSupernova} canExpand={starCanExpand} />
@@ -359,305 +397,6 @@ const SolarSystem = () => {
           }}
         />
       ))}
-      
-      {/* UI Controls */}
-      <Html fullscreen>
-        <div style={{
-          position: 'absolute',
-          top: '20px',
-          right: '20px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '15px',
-          zIndex: 1000,
-          opacity: (isSupernova || isWormhole) ? 0 : 1,
-          pointerEvents: (isSupernova || isWormhole) ? 'none' : 'auto',
-          transition: 'opacity 0.5s ease'
-        }}>
-          {/* Supernova Button */}
-          <button
-            onClick={handleSupernova}
-            disabled={isSupernova}
-            style={{
-              padding: '12px 24px',
-              fontSize: '16px',
-              fontWeight: 'bold',
-              backgroundColor: isSupernova ? '#666' : '#251b17ff',
-              color: 'white',
-              border: 'none',
-              borderRadius: '8px',
-              cursor: isSupernova ? 'not-allowed' : 'pointer',
-              boxShadow: '0 4px 6px rgba(0,0,0,0.3)',
-              transition: 'all 0.3s ease',
-            }}
-          >
-            {isSupernova ? 'Supernova Active...' : 'Trigger Supernova'}
-          </button>
-
-          {/* Wormhole Button */}
-          <button
-            onClick={handleWormhole}
-            disabled={isWormhole}
-            style={{
-              padding: '12px 24px',
-              fontSize: '16px',
-              fontWeight: 'bold',
-              backgroundColor: isWormhole ? '#666' : '#251b17ff',
-              color: 'white',
-              border: 'none',
-              borderRadius: '8px',
-              cursor: isWormhole ? 'not-allowed' : 'pointer',
-              boxShadow: '0 4px 6px rgba(0,0,0,0.3)',
-              transition: 'all 0.3s ease',
-            }}
-          >
-            {isWormhole ? 'Wormhole Active...' : 'Trigger Wormhole'}
-          </button>
-
-          {/* Planet Focus Section */}
-          <div style={{
-            backgroundColor: 'rgba(0, 0, 0, 0.7)',
-            padding: '15px',
-            borderRadius: '8px',
-            boxShadow: '0 4px 6px rgba(0,0,0,0.3)',
-            color: 'white',
-            minWidth: '250px'
-          }}>
-            <div style={{
-              fontSize: '14px',
-              fontWeight: 'bold',
-              marginBottom: '10px'
-            }}>
-              Focus Planet
-            </div>
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(2, 1fr)',
-              gap: '8px'
-            }}>
-              {planets.map((planet, index) => (
-                <button
-                  key={index}
-                  onClick={() => setLockedPlanet(index)}
-                  disabled={lockedPlanet === index}
-                  style={{
-                    padding: '8px',
-                    fontSize: '12px',
-                    fontWeight: 'bold',
-                    backgroundColor: lockedPlanet === index ? planet.color : 'rgba(255,255,255,0.1)',
-                    color: 'white',
-                    border: `2px solid ${planet.color}`,
-                    borderRadius: '6px',
-                    cursor: lockedPlanet === index ? 'not-allowed' : 'pointer',
-                    transition: 'all 0.2s ease',
-                  }}
-                >
-                  {planet.name}
-                </button>
-              ))}
-            </div>
-            {lockedPlanet !== null && (
-              <button
-                onClick={() => setLockedPlanet(null)}
-                style={{
-                  marginTop: '10px',
-                  width: '100%',
-                  padding: '8px',
-                  fontSize: '14px',
-                  fontWeight: 'bold',
-                  backgroundColor: '#CC0000',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease',
-                }}
-              >
-                ✕ Unlock Camera
-              </button>
-            )}
-          </div>
-          
-          {/* FOV Slider */}
-          <div style={{
-            backgroundColor: 'rgba(0, 0, 0, 0.7)',
-            padding: '15px',
-            borderRadius: '8px',
-            boxShadow: '0 4px 6px rgba(0,0,0,0.3)',
-            color: 'white',
-            minWidth: '250px'
-          }}>
-            <label style={{
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '8px',
-              fontSize: '14px',
-              fontWeight: 'bold'
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span>Field of View</span>
-                <span>{fov}°</span>
-              </div>
-              <input
-                type="range"
-                min="50"
-                max="100"
-                value={fov}
-                onChange={(e) => setFov(Number(e.target.value))}
-                onPointerDown={() => setIsDraggingSlider(true)}
-                onPointerUp={() => setIsDraggingSlider(false)}
-                style={{
-                  width: '100%',
-                  cursor: 'pointer',
-                  accentColor: '#3d281fff'
-                }}
-              />
-              <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                fontSize: '11px',
-                color: '#aaa'
-              }}>
-              </div>
-            </label>
-          </div>
-
-          {/* Speed Slider */}
-          <div style={{
-            backgroundColor: 'rgba(0, 0, 0, 0.7)',
-            padding: '15px',
-            borderRadius: '8px',
-            boxShadow: '0 4px 6px rgba(0,0,0,0.3)',
-            color: 'white',
-            minWidth: '250px'
-          }}>
-            <label style={{
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '8px',
-              fontSize: '14px',
-              fontWeight: 'bold'
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span>Orbital Speed</span>
-                <span>{speedMultiplier.toFixed(0)}</span>
-              </div>
-              <input
-                type="range"
-                min="1"
-                max="50"
-                step="1"
-                value={speedMultiplier}
-                onChange={(e) => setSpeedMultiplier(Number(e.target.value))}
-                onPointerDown={() => setIsDraggingSlider(true)}
-                onPointerUp={() => setIsDraggingSlider(false)}
-                style={{
-                  width: '100%',
-                  cursor: 'pointer',
-                  accentColor: '#3d281fff'
-                }}
-              />
-              <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                fontSize: '11px',
-                color: '#aaa'
-              }}>
-              </div>
-            </label>
-          </div>
-
-          {/* Sensitivity Slider */}
-          <div style={{
-            backgroundColor: 'rgba(0, 0, 0, 0.7)',
-            padding: '15px',
-            borderRadius: '8px',
-            boxShadow: '0 4px 6px rgba(0,0,0,0.3)',
-            color: 'white',
-            minWidth: '250px'
-          }}>
-            <label style={{
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '8px',
-              fontSize: '14px',
-              fontWeight: 'bold'
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span>Arrow Key Sensitivity</span>
-                <span>{sensitivity.toFixed(0)}</span>
-              </div>
-              <input
-                type="range"
-                min="1"
-                max="10"
-                step="1"
-                value={sensitivity}
-                onChange={(e) => setSensitivity(Number(e.target.value))}
-                onPointerDown={() => setIsDraggingSlider(true)}
-                onPointerUp={() => setIsDraggingSlider(false)}
-                style={{
-                  width: '100%',
-                  cursor: 'pointer',
-                  accentColor: '#3d281fff'
-                }}
-              />
-              <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                fontSize: '11px',
-                color: '#aaa'
-              }}>
-              </div>
-            </label>
-          </div>
-
-          {/* Orbit Opacity Slider */}
-          <div style={{
-            backgroundColor: 'rgba(0, 0, 0, 0.7)',
-            padding: '15px',
-            borderRadius: '8px',
-            boxShadow: '0 4px 6px rgba(0,0,0,0.3)',
-            color: 'white',
-            minWidth: '250px'
-          }}>
-            <label style={{
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '8px',
-              fontSize: '14px',
-              fontWeight: 'bold'
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span>Orbit Rings Opacity</span>
-                <span>{(orbitOpacity * 100).toFixed(0)}%</span>
-              </div>
-              <input
-                type="range"
-                min="0"
-                max="1"
-                step="0.05"
-                value={orbitOpacity}
-                onChange={(e) => setOrbitOpacity(Number(e.target.value))}
-                onPointerDown={() => setIsDraggingSlider(true)}
-                onPointerUp={() => setIsDraggingSlider(false)}
-                style={{
-                  width: '100%',
-                  cursor: 'pointer',
-                  accentColor: '#3d281fff'
-                }}
-              />
-              <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                fontSize: '11px',
-                color: '#aaa'
-              }}>
-              </div>
-            </label>
-          </div>
-        </div>
-      </Html>
     </>
   )
 }
